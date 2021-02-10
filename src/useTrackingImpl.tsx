@@ -2,9 +2,26 @@ import { useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import merge from 'deepmerge';
 
 import ReactTrackingContext from './ReactTrackingContext';
-import dispatchTrackingEvent from './dispatchTrackingEvent';
+import dispatchTrackingEvent, { Dispatch } from './dispatchTrackingEvent';
 
-export default function useTrackingImpl(trackingData, options) {
+export interface TrackingData {}
+
+export type DispatchOnMountFunc = <T extends Record<string, unknown>>(
+  data?: T
+) => T & TrackingData;
+
+export type ProcessFunc = (data: Record<string, unknown>) => any;
+
+export interface UseTrackingImplOptions {
+  dispatch?: Dispatch;
+  dispatchOnMount?: boolean | DispatchOnMountFunc;
+  forwardRef?: boolean;
+  process?: ProcessFunc;
+}
+
+export default function useTrackingImpl<
+  T extends Record<string, unknown> | (() => Record<string, unknown>)
+>(trackingData: T, options?: UseTrackingImplOptions) {
   const { tracking } = useContext(ReactTrackingContext);
   const latestData = useRef(trackingData);
   const latestOptions = useRef(options);
@@ -29,7 +46,17 @@ export default function useTrackingImpl(trackingData, options) {
 
   const getOwnTrackingData = useCallback(() => {
     const data = latestData.current;
-    const ownTrackingData = typeof data === 'function' ? data() : data;
+    let ownTrackingData: Record<string, unknown>;
+    /**
+     * TODO: remove typecast once this issue is fixed:
+     * @see https://github.com/microsoft/TypeScript/issues/37663
+     */
+    if (typeof data === 'function') {
+      ownTrackingData = (data as Function)();
+    } else {
+      ownTrackingData = data as Record<string, unknown>;
+    }
+    // const ownTrackingData =  ? data() : data;
     return ownTrackingData || {};
   }, []);
 
